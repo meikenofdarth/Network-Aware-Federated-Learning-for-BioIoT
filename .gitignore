@@ -1,0 +1,73 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+venv/
+env/
+.venv/
+myenv/
+
+# Pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# gRPC / Protobuf
+# =========================
+*_pb2.py
+*_pb2_grpc.py
+
+# =========================
+# Ansible
+# =========================
+*.retry
+.ansible/
+ansible.log
+
+# =========================
+# Kubernetes
+# =========================
+*.kubeconfig
+.kube/
+.kubectl/
+
+# =========================
+# Logs & runtime
+# =========================
+*.log
+*.pid
+*.out
+
+# =========================
+# IDEs & Editors
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS-specific
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Secrets (IMPORTANT)
+# =========================
+.env
+*.key
+*.pem
+*.crt
