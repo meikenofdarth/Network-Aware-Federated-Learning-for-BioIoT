@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aggregator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hospital-a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hospital-b
+---
+# Label namespaces for NetworkPolicy discovery
+# kubectl label ns hospital-a kubernetes.io/metadata.name=hospital-a
+# kubectl label ns hospital-b kubernetes.io/metadata.name=hospital-b
+# kubectl label ns aggregator kubernetes.io/metadata.name=aggregator
+
+---
+# Network Policy for Hospital A
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hospital-a-egress
+  namespace: hospital-a
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: aggregator}}}]
+  - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+# Network Policy for Hospital B
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hospital-b-egress
+  namespace: hospital-b
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+  - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: aggregator}}}]
+  - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aggregator-service
+  namespace: aggregator
+spec:
+  selector:
+    app: hpc-aggregator
+  ports:
+    - protocol: TCP
+      port: 50051
+      targetPort: 50051
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpc-aggregator
+  namespace: aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hpc-aggregator
+  template:
+    metadata:
+      labels:
+        app: hpc-aggregator
+    spec:
+      containers:
+      - name: aggregator
+        image: hpc-aggregator:v1
+        ports:
+        - containerPort: 50051
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "300m"
+            memory: "256Mi"
