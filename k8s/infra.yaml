@@ -13,12 +13,6 @@ kind: Namespace
 metadata:
   name: hospital-b
 ---
-# Label namespaces for NetworkPolicy discovery
-# kubectl label ns hospital-a kubernetes.io/metadata.name=hospital-a
-# kubectl label ns hospital-b kubernetes.io/metadata.name=hospital-b
-# kubectl label ns aggregator kubernetes.io/metadata.name=aggregator
-
----
 # Network Policy for Hospital A
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -44,7 +38,18 @@ spec:
   egress:
   - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: aggregator}}}]
   - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
-
+---
+# CNE Focus: Allow Aggregator to talk to Azure Cloud (Public Internet)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: aggregator-egress-policy
+  namespace: aggregator
+spec:
+  podSelector: { matchLabels: { app: hpc-aggregator } }
+  policyTypes: ["Egress"]
+  egress:
+  - {} # This allows ALL egress from aggregator to reach Azure APIs
 ---
 apiVersion: v1
 kind: Service
@@ -79,6 +84,16 @@ spec:
         image: hpc-aggregator:v1
         ports:
         - containerPort: 50051
+        env:
+        - name: ADT_URL
+          value: "https://BioSyncTwin.api.sea.digitaltwins.azure.net"
+        # CNE Security: Mapping Azure Secrets from K8s to Environment
+        - name: AZURE_CLIENT_ID
+          valueFrom: { secretKeyRef: { name: azure-creds, key: AZURE_CLIENT_ID } }
+        - name: AZURE_CLIENT_SECRET
+          valueFrom: { secretKeyRef: { name: azure-creds, key: AZURE_CLIENT_SECRET } }
+        - name: AZURE_TENANT_ID
+          valueFrom: { secretKeyRef: { name: azure-creds, key: AZURE_TENANT_ID } }
         resources:
           requests:
             cpu: "100m"
