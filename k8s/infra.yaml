@@ -13,6 +13,19 @@ kind: Namespace
 metadata:
   name: hospital-b
 ---
+# Shared Storage for Federated Weights
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-buffer-pvc
+  namespace: aggregator
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+---
 # Network Policy for Hospital A
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -39,7 +52,7 @@ spec:
   - to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: aggregator}}}]
   - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
 ---
-# CNE Focus: Allow Aggregator to talk to Azure Cloud (Public Internet)
+# Allow Aggregator to talk to Azure Cloud
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -49,7 +62,7 @@ spec:
   podSelector: { matchLabels: { app: hpc-aggregator } }
   policyTypes: ["Egress"]
   egress:
-  - {} # This allows ALL egress from aggregator to reach Azure APIs
+  - {} 
 ---
 apiVersion: v1
 kind: Service
@@ -87,13 +100,15 @@ spec:
         env:
         - name: ADT_URL
           value: "https://BioSyncTwin.api.sea.digitaltwins.azure.net"
-        # CNE Security: Mapping Azure Secrets from K8s to Environment
         - name: AZURE_CLIENT_ID
           valueFrom: { secretKeyRef: { name: azure-creds, key: AZURE_CLIENT_ID } }
         - name: AZURE_CLIENT_SECRET
           valueFrom: { secretKeyRef: { name: azure-creds, key: AZURE_CLIENT_SECRET } }
         - name: AZURE_TENANT_ID
           valueFrom: { secretKeyRef: { name: azure-creds, key: AZURE_TENANT_ID } }
+        volumeMounts:
+        - name: weight-storage
+          mountPath: /app/weights
         resources:
           requests:
             cpu: "100m"
@@ -101,3 +116,36 @@ spec:
           limits:
             cpu: "300m"
             memory: "256Mi"
+      volumes:
+      - name: weight-storage
+        persistentVolumeClaim:
+          claimName: model-buffer-pvc
+
+---
+# Tier 3: Global Federated Aggregator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: global-aggregator
+  namespace: aggregator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: global-aggregator
+  template:
+    metadata:
+      labels:
+        app: global-aggregator
+    spec:
+      containers:
+      - name: fed-avg-engine
+        image: hpc-aggregator:v1
+        command: ["python", "fed_avg.py"]
+        volumeMounts:
+        - name: weight-storage
+          mountPath: /app/weights
+      volumes:
+      - name: weight-storage
+        persistentVolumeClaim:
+          claimName: model-buffer-pvc
